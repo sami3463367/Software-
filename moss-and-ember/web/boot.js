@@ -2,6 +2,9 @@
 // Boots the Godot 4.7.2 wasm engine, stages the project files into its
 // in-memory filesystem, and lets the engine run the project.
 import * as emnapi from './emnapi.js';
+// Static import: bundlers inline this into single-file builds, and on the web
+// server it is fetched alongside the page (261 KB).
+import godotFactory from './engine/godot.js';
 
 const $ = (id) => document.getElementById(id);
 const loader = $('loader');
@@ -40,11 +43,56 @@ if (params.has('selftest')) engineArgs.push('--self-test');
 if (params.has('autostart')) engineArgs.push('--autostart');
 if (params.has('slow')) engineArgs.push('--slow');
 
+// Single-file builds inline everything: window.__MOSS_PAYLOAD = { wasm, files,
+// worklets } with base64 bodies (optionally gzipped as __MOSS_PAYLOAD_GZ). In
+// that mode nothing is fetched over the network, so the page also works from
+// file:// with no server at all.
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function loadEmbedded() {
+  if (globalThis.__MOSS_PAYLOAD) return globalThis.__MOSS_PAYLOAD;
+  if (!globalThis.__MOSS_PAYLOAD_GZ) return null;
+  if (typeof DecompressionStream !== 'function') {
+    throw new Error('this browser cannot open the offline build — use the live link instead');
+  }
+  const bytes = b64ToBytes(globalThis.__MOSS_PAYLOAD_GZ);
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(stream).text());
+}
+
 async function boot(useFallback) {
   try {
     setMsg(useFallback ? 'Fallback start…' : 'Loading engine…');
     setPct(0.02);
-    if (!Module) {
+    const embedded = await loadEmbedded();
+    if (embedded) {
+      setMsg('Unpacking the game…');
+      const wasmBytes = b64ToBytes(embedded.wasm);
+      setPct(0.2);
+      const workletUrls = {};
+      for (const [name, body] of Object.entries(embedded.worklets || {})) {
+        workletUrls[name] = URL.createObjectURL(new Blob([body], { type: 'text/javascript' }));
+      }
+      const modFactory = godotFactory;
+      Module = await modFactory({
+        canvas,
+        locateFile: (p) => workletUrls[p] || p,
+        wasmBinary: wasmBytes.buffer,
+        print: (t) => { log('· ' + t); },
+        printErr: (t) => { log('! ' + t); },
+      });
+      window.__mod = Module;
+      for (const [res, b64] of Object.entries(embedded.files)) {
+        Module.copyToFS('/' + res, b64ToBytes(b64));
+      }
+      log('unpacked ' + Object.keys(embedded.files).length + ' game files');
+    }
+    if (!Module && !embedded) {
       // Download the wasm ourselves to show real progress on slow links.
       const wr = await fetch('godot.wasm', { cache: 'no-store' });
       if (!wr.ok) throw new Error('fetch godot.wasm -> HTTP ' + wr.status);
@@ -63,7 +111,7 @@ async function boot(useFallback) {
       const buf = new Uint8Array(got);
       let off = 0;
       for (const c of chunks) { buf.set(c, off); off += c.length; }
-      const modFactory = (await import('./godot.js')).default;
+      const modFactory = godotFactory;
       Module = await modFactory({
         canvas,
         locateFile: (p) => p,
@@ -74,22 +122,23 @@ async function boot(useFallback) {
       });
     }
     window.__mod = Module;  // debug handle for the browser smoke test
-    setMsg('Staging game files…');
-    const manifest = await (await fetch('files.json', { cache: 'no-store' })).json();
-    let i = 0;
-    for (const f of manifest.files) {
-      const r = await fetch(f.http, { cache: 'no-store' });
-      if (!r.ok) throw new Error('fetch ' + f.http + ' -> HTTP ' + r.status);
-      const bytes = new Uint8Array(await r.arrayBuffer());
-      // copy_to_fs() builds directories from the literal string, so this must
-      // be an absolute path: "/project.godot" -> FS root (which the engine
-      // maps to res://). A "res://" prefix would create a folder named "res:".
-      Module.copyToFS('/' + f.res, bytes);
-      i++;
-      if (i % 4 === 0 || i === manifest.files.length) {
-        setPct(0.1 + 0.85 * (i / manifest.files.length));
-        setMsg('Staging game files… ' + i + '/' + manifest.files.length);
-        log('staged /' + f.res);
+    if (!embedded) {
+      setMsg('Staging game files…');
+      const manifest = await (await fetch('files.json', { cache: 'no-store' })).json();
+      let i = 0;
+      for (const f of manifest.files) {
+        const r = await fetch(f.http, { cache: 'no-store' });
+        if (!r.ok) throw new Error('fetch ' + f.http + ' -> HTTP ' + r.status);
+        const bytes = new Uint8Array(await r.arrayBuffer());
+        // copy_to_fs() builds directories from the literal string, so this must
+        // be an absolute path: "/project.godot" -> FS root (which the engine
+        // maps to res://). A "res://" prefix would create a folder named "res:".
+        Module.copyToFS('/' + f.res, bytes);
+        i++;
+        if (i % 4 === 0 || i === manifest.files.length) {
+          setPct(0.1 + 0.85 * (i / manifest.files.length));
+          setMsg('Staging game files… ' + i + '/' + manifest.files.length);
+        }
       }
     }
     // Test hooks: stage a small flags file the game reads at startup. This is

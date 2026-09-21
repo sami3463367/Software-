@@ -34,6 +34,10 @@ playable right now in the browser; no installation, no PC required.
 - **Audio:** ships as `.tres` resources with base64 PCM (`tools/wav_to_tres.py`),
   so the runtime needs no import cache — the web build loads the same files the
   desktop build does.
+- **Offline single file:** `python3 tools/build_single_file.py` inlines the engine
+  and every game file into `build/MossAndEmber.html` (~14 MB) — playable by
+  double-clicking, no server and no internet (also copied to `docs/` for download
+  from GitHub).
 - **Browser smoke test:** `node tools/boottest.cjs` boots the real page in a
   headless Chromium (see `tools/setup_chromelibs.sh` for the one-time setup),
   runs the in-engine self-test via `?selftest` and fails on any script error.

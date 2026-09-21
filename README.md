@@ -2,8 +2,11 @@
 
 Our first product is **Moss & Ember**, a cozy 3D farm sim.
 
+- ▶️ **Play it now (no install):** [`docs/MossAndEmber.html`](docs/MossAndEmber.html)
+  — the whole game in one file (~14 MB). Download it and double-click, or open
+  [`docs/index.html`](docs/index.html) for the same link with instructions.
 - 🌱 **Game code + docs:** [`moss-and-ember/`](moss-and-ember/README.md)
-  (Godot 4.7 project — slice 0.1 is playable in the browser)
+  (Godot 4.7 project — slice 0.1)
 - 🎨 **Art direction references:** [`concepts/`](concepts/) (Style A: bright cartoon)
 
 ## How we build

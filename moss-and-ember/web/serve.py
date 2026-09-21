@@ -42,7 +42,9 @@ GAME_DIR = os.path.join(OUT, "game")
 # (file in build/web/, file in web/engine/) — the engine template requests the
 # worklets by their *output* names via locate_file("godot.audio.worklet.js").
 ENGINE_FILES = (
-    ("godot.js", "godot.js"),
+    # boot.js statically imports ./engine/godot.js, so the glue lives in engine/
+    ("engine/godot.js", "godot.js"),
+    # the rest are fetched by the engine relative to the page
     ("godot.wasm", "godot.wasm"),
     ("godot.audio.worklet.js", "audio.worklet.js"),
     ("godot.audio.position.worklet.js", "audio.position.worklet.js"),
@@ -74,7 +76,9 @@ def build_site() -> None:
     os.makedirs(OUT, exist_ok=True)
     # 1. engine + page shell
     for dst, src in ENGINE_FILES:
-        shutil.copy(os.path.join(ENGINE_DIR, src), os.path.join(OUT, dst))
+        target = os.path.join(OUT, dst)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copy(os.path.join(ENGINE_DIR, src), target)
     for local in ("index.html", "boot.js", "emnapi.js"):
         shutil.copy(os.path.join(ROOT, "web", local), os.path.join(OUT, local))
 
