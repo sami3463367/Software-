@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Moss &amp; Ember — Slice 0.1</title>
+<style>
+  html, body, #c { margin: 0; padding: 0; border: 0; width: 100%; height: 100%; }
+  body { background: #0b1020; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #c { display: block; width: 100%; height: 100%; }
+  #loader {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; gap: 14px;
+    align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #4d86c4 0%, #7db8e8 60%, #9fd08a 100%);
+    transition: opacity 0.8s;
+  }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  #logo { font-size: 40px; font-weight: 800; letter-spacing: 2px; color: #fff;
+          text-shadow: 0 2px 10px rgba(30,60,20,0.35); }
+  #logo small { display: block; font-size: 14px; font-weight: 500; letter-spacing: 4px; opacity: 0.9; }
+  #bar { width: 260px; max-width: 70vw; height: 10px; background: rgba(255,255,255,0.35);
+         border-radius: 5px; overflow: hidden; }
+  #fill { height: 100%; width: 0%; background: #ffd76a; transition: width 0.15s; }
+  #msg { font-size: 13px; opacity: 0.9; text-align: center; padding: 0 16px; }
+  #retry { display: none; margin-top: 6px; padding: 8px 18px; font-size: 14px;
+           border: 0; border-radius: 10px; background: #5aa83e; color: #fff; cursor: pointer; }
+  #console-btn { position: fixed; top: 8px; right: 8px; z-index: 20; display: none; /* shown on error or ?debug */
+                 padding: 4px 10px; font-size: 11px; border: 0; border-radius: 8px;
+                 background: rgba(0,0,0,0.45); color: #cfe3ff; cursor: pointer; }
+  #console { position: fixed; top: 0; right: 0; z-index: 19; width: 100%; max-width: 520px;
+             height: 0; overflow-y: auto; transition: height 0.2s;
+             background: rgba(5,8,16,0.88); color: #9fd39f; font-size: 11px;
+             font-family: ui-monospace, monospace; padding: 8px; box-sizing: border-box;
+             white-space: pre-wrap; }
+  #console.open { height: 40vh; }
+  #controls-hint { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
+                   z-index: 15; font-size: 11px; color: rgba(255,255,255,0.75);
+                   background: rgba(0,0,0,0.35); padding: 4px 12px; border-radius: 10px;
+                   display: none; text-align: center; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="loader">
+  <div id="logo">MOSS &amp; EMBER<small>a cozy farm in the valley</small></div>
+  <div id="bar"><div id="fill"></div></div>
+  <div id="msg">warming up…</div>
+  <button id="retry">Retry with fallback start</button>
+</div>
+<button id="console-btn" aria-label="show engine log">engine log</button>
+<div id="console"></div>
+<div id="controls-hint">WASD / arrows: move · drag right side: camera · E: interact · Shift: run · 1/2/3: seeds · M: mute</div>
+<canvas id="c"></canvas>
+<script>
+  // Surface load-time failures in the loader UI instead of a silent hang.
+  (function () {
+    var msg = document.getElementById("msg");
+    function show(text) { if (msg) { msg.textContent = text; msg.style.color = "#ffe0e0"; } }
+    window.addEventListener("error", function (e) {
+      var detail = e.message || (e.target && e.target.src) || "failed to load";
+      show("Could not start the engine: " + detail);
+    }, true);
+    window.addEventListener("unhandledrejection", function (e) {
+      var r = e.reason;
+      show("Could not start the engine: " + (r && r.message ? r.message : String(r)));
+    });
+  })();
+</script>
+<script type="module" src="./boot.js"></script>
+</body>
+</html>
