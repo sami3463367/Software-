@@ -54,6 +54,15 @@ function b64ToBytes(b64) {
   return out;
 }
 
+// Payload blobs are gzip-compressed and base64'd (base64 only ever expands the
+// already-small data). Decompress with the browser's built-in gunzip.
+async function blobFromB64(b64) {
+  const bytes = b64ToBytes(b64);
+  if (typeof DecompressionStream !== 'function') return bytes;
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
 async function loadEmbedded() {
   if (globalThis.__MOSS_PAYLOAD) return globalThis.__MOSS_PAYLOAD;
   if (!globalThis.__MOSS_PAYLOAD_GZ) return null;
@@ -72,7 +81,7 @@ async function boot(useFallback) {
     const embedded = await loadEmbedded();
     if (embedded) {
       setMsg('Unpacking the game…');
-      const wasmBytes = b64ToBytes(embedded.wasm);
+      const wasmBytes = embedded.gz ? await blobFromB64(embedded.wasm) : b64ToBytes(embedded.wasm);
       setPct(0.2);
       const workletUrls = {};
       for (const [name, body] of Object.entries(embedded.worklets || {})) {
@@ -87,10 +96,11 @@ async function boot(useFallback) {
         printErr: (t) => { log('! ' + t); },
       });
       window.__mod = Module;
-      for (const [res, b64] of Object.entries(embedded.files)) {
-        Module.copyToFS('/' + res, b64ToBytes(b64));
+      const entries = Object.entries(embedded.files);
+      for (const [res, b64] of entries) {
+        Module.copyToFS('/' + res, embedded.gz ? await blobFromB64(b64) : b64ToBytes(b64));
       }
-      log('unpacked ' + Object.keys(embedded.files).length + ' game files');
+      log('unpacked ' + entries.length + ' game files');
     }
     if (!Module && !embedded) {
       // Download the wasm ourselves to show real progress on slow links.

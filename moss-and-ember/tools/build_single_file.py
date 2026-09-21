@@ -29,6 +29,11 @@ GAME_EXTS = {".gd", ".uid", ".tscn", ".tres", ".godot", ".json", ".svg", ".png"}
 SKIP_DIRS = {"build", ".git", "web", "tools", "concepts", "docs"}
 
 
+def gz_b64(raw: bytes) -> str:
+    """Compress first, then base64: base64 expansion lands on the small data."""
+    return base64.b64encode(gzip.compress(raw, 9)).decode()
+
+
 def collect_game_files():
     files = {}
     for dirpath, dirnames, filenames in os.walk(ROOT):
@@ -63,15 +68,19 @@ def bundle_boot():
 def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     game = collect_game_files()
+    # every blob is gzip-compressed and then base64'd (not the other way round)
     payload = {
-        "wasm": base64.b64encode(open(os.path.join(ENGINE, "godot.wasm"), "rb").read()).decode(),
+        "gz": True,
+        "wasm": gz_b64(open(os.path.join(ENGINE, "godot.wasm"), "rb").read()),
         "worklets": {
             "godot.audio.worklet.js": open(os.path.join(ENGINE, "audio.worklet.js"), encoding="utf-8").read(),
             "godot.audio.position.worklet.js": open(os.path.join(ENGINE, "audio.position.worklet.js"), encoding="utf-8").read(),
         },
-        "files": {k: base64.b64encode(v).decode() for k, v in game.items()},
+        "files": {k: gz_b64(v) for k, v in game.items()},
     }
-    packed = base64.b64encode(gzip.compress(json.dumps(payload).encode(), 9)).decode()
+    # the payload goes in as plain JSON/JS object text — no outer base64, which
+    # would just re-expand the already-compressed blobs by another third
+    packed = json.dumps(payload, separators=(",", ":"))
     boot_js = bundle_boot()
 
     with open(os.path.join(ROOT, "web", "index.html"), encoding="utf-8") as f:
@@ -99,7 +108,7 @@ def main():
     )
     html = html.replace(old_tag,
                         file_shim +
-                        '<script>window.__MOSS_PAYLOAD_GZ="' + packed + '";</script>\n'
+                        '<script>window.__MOSS_PAYLOAD=' + packed + ';</script>\n'
                         '<script>' + boot_js + '</script>')
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(html)
