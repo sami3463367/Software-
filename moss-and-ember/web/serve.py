@@ -127,10 +127,9 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=OUT, **kwargs)
 
     def end_headers(self):
-        # Cross-origin isolation (needed by threaded Godot web builds; harmless
-        # for the nothreads one) + always-fresh js/wasm so rebuilds show up.
-        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
-        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        # Deliberately no COOP/COEP: the threaded Godot builds need cross-origin
+        # isolation, but this one is single-threaded, and COEP would make the
+        # page refuse to load inside an embedding iframe (e.g. a preview panel).
         if self.path.endswith((".wasm", ".js", ".json", ".html")):
             self.send_header("Cache-Control", "no-cache")
         super().end_headers()
