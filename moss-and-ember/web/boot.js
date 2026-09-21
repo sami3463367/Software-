@@ -16,8 +16,11 @@ let godotLogCount = 0;
 
 function setMsg(t) { msg.textContent = t; }
 function setPct(p) { fill.style.width = (Math.max(0, Math.min(1, p)) * 100).toFixed(0) + '%'; }
+function showConsoleButton() { consoleBtn.style.display = 'block'; }
+
 function log(line) {
   godotLogCount++;
+  if (/^!/.test(line)) showConsoleButton();
   consoleEl.textContent += line + '\n';
   if (consoleEl.textContent.length > 20000) {
     consoleEl.textContent = consoleEl.textContent.slice(-12000);
@@ -28,6 +31,14 @@ consoleBtn.addEventListener('click', () => consoleEl.classList.toggle('open'));
 
 const canvas = $('c');
 let Module = null;
+
+// Test hooks: the page query string is turned into real engine command-line
+// arguments ("-- <args>"), which the project reads via OS.get_cmdline_user_args().
+const params = new URLSearchParams(location.search);
+const engineArgs = ['--'];
+if (params.has('selftest')) engineArgs.push('--self-test');
+if (params.has('autostart')) engineArgs.push('--autostart');
+if (params.has('slow')) engineArgs.push('--slow');
 
 async function boot(useFallback) {
   try {
@@ -57,10 +68,12 @@ async function boot(useFallback) {
         canvas,
         locateFile: (p) => p,
         wasmBinary: buf.buffer,
+        arguments: engineArgs,
         print: (t) => { log('· ' + t); },
         printErr: (t) => { log('! ' + t); },
       });
     }
+    window.__mod = Module;  // debug handle for the browser smoke test
     setMsg('Staging game files…');
     const manifest = await (await fetch('files.json', { cache: 'no-store' })).json();
     let i = 0;
@@ -68,24 +81,89 @@ async function boot(useFallback) {
       const r = await fetch(f.http, { cache: 'no-store' });
       if (!r.ok) throw new Error('fetch ' + f.http + ' -> HTTP ' + r.status);
       const bytes = new Uint8Array(await r.arrayBuffer());
-      Module.copyToFS('res://' + f.res, bytes);
+      // copy_to_fs() builds directories from the literal string, so this must
+      // be an absolute path: "/project.godot" -> FS root (which the engine
+      // maps to res://). A "res://" prefix would create a folder named "res:".
+      Module.copyToFS('/' + f.res, bytes);
       i++;
       if (i % 4 === 0 || i === manifest.files.length) {
         setPct(0.1 + 0.85 * (i / manifest.files.length));
         setMsg('Staging game files… ' + i + '/' + manifest.files.length);
+        log('staged /' + f.res);
       }
     }
+    // Test hooks: stage a small flags file the game reads at startup. This is
+    // how the browser smoke test asks for the in-engine self-test (?selftest)
+    // or jumps straight into gameplay (?autostart).
+    const flags = {};
+    for (const key of ['selftest', 'autostart', 'noon', 'photo']) if (params.has(key)) flags[key] = true;
+    if (Object.keys(flags).length) {
+      Module.copyToFS('/test_flags.json', new TextEncoder().encode(JSON.stringify(flags)));
+      log('staged /test_flags.json ' + JSON.stringify(flags));
+    }
+
     setMsg('Starting engine…');
     Module.initConfig({ canvas, canvasResizePolicy: 2 });
     const ctx = emnapi.getDefaultContext();
     const mod = Module.emnapiInit({ context: ctx });
     mod.stageFile = Module.copyToFS;
     ctx.openScope();
+
+    // The addon starts the engine, but frames only advance when the host
+    // drives them — the same loop @ringozz/godot runs on the web:
+    //   while (!godot.iteration()) await new Promise(requestAnimationFrame);
+    // `iteration()` is GodotInstance's method binding 8470 (see
+    // @ringozz/godot/gen/classes/GodotInstance.ts); it returns true once the
+    // engine wants to quit.
+    if (!mod.requestAnimationFrame) log('note: engine rAF unavailable, using timer frames');
+    globalThis.requestAnimationFrame = mod.requestAnimationFrame ?? globalThis.requestAnimationFrame;
+    globalThis.cancelAnimationFrame = mod.cancelAnimationFrame ?? globalThis.cancelAnimationFrame;
+    const raf = (mod.requestAnimationFrame || globalThis.requestAnimationFrame ||
+      ((cb) => setTimeout(() => cb(performance.now()), 16))).bind(globalThis);
+    const godot = mod.getGodot();
+    window.__godot = godot;
+    const iterate = typeof godot.iteration === 'function'
+      ? () => godot.iteration()
+      : () => mod._C(godot, 8470);
+
+    // Race rAF against a timer: browsers throttle rAF in hidden/background
+    // tabs (and headless test runs), and the game must keep ticking there.
+    const nextFrame = () => new Promise((resolve) => {
+      let done = false;
+      const timer = setTimeout(() => { if (!done) { done = true; resolve(); } }, 250);
+      try {
+        raf(() => { if (!done) { done = true; clearTimeout(timer); resolve(); } });
+      } catch (e) {
+        if (!done) { done = true; clearTimeout(timer); resolve(); }
+      }
+    });
+
+    (async () => {
+      let frames = 0;
+      try {
+        let reportAt = performance.now() + 4000;
+        while (!iterate()) {
+          frames++;
+          if (frames === 1) log('main loop running');
+          if (performance.now() >= reportAt) {
+            reportAt = performance.now() + 4000;
+            log('frames so far: ' + frames);
+          }
+          await nextFrame();
+        }
+        log('engine asked to quit after ' + frames + ' frames');
+        setMsg('The game has stopped.');
+      } catch (e) {
+        log('! main loop error: ' + (e && e.message ? e.message : e));
+        setMsg('Engine stopped: ' + (e && e.message ? e.message : e));
+      }
+    })();
+
     setPct(1.0);
     setMsg(useFallback ? 'Fallback requested — watch the engine log.' : 'Running…');
+    if (params.has('debug')) showConsoleButton();
     setTimeout(() => {
       hint.style.display = 'block';
-      consoleBtn.style.display = 'block';
       setTimeout(() => loader.classList.add('hide'), 900);
       setTimeout(() => { hint.style.display = 'none'; }, 14000);
     }, 600);
@@ -97,12 +175,12 @@ async function boot(useFallback) {
 }
 
 retryBtn.addEventListener('click', () => {
-  // If the engine booted but never started the main loop, try the standard
-  // entry point explicitly with the staged project.
+  // Retry booting from scratch (the engine's main() can only run once, so a
+  // failed boot needs a fresh module rather than a callMain).
   if (Module && typeof Module.callMain === 'function') {
     setMsg('Calling engine main directly…');
     try {
-      Module.callMain(['res://project.godot']);
+      Module.callMain(['--path', '/']);
     } catch (e) {
       setMsg('Fallback failed: ' + e.message);
       console.error(e);

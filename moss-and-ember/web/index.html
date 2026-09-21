@@ -25,7 +25,7 @@
   #msg { font-size: 13px; opacity: 0.9; text-align: center; padding: 0 16px; }
   #retry { display: none; margin-top: 6px; padding: 8px 18px; font-size: 14px;
            border: 0; border-radius: 10px; background: #5aa83e; color: #fff; cursor: pointer; }
-  #console-btn { position: fixed; top: 8px; right: 8px; z-index: 20; display: none;
+  #console-btn { position: fixed; top: 8px; right: 8px; z-index: 20; display: none; /* shown on error or ?debug */
                  padding: 4px 10px; font-size: 11px; border: 0; border-radius: 8px;
                  background: rgba(0,0,0,0.45); color: #cfe3ff; cursor: pointer; }
   #console { position: fixed; top: 0; right: 0; z-index: 19; width: 100%; max-width: 520px;
@@ -51,6 +51,21 @@
 <div id="console"></div>
 <div id="controls-hint">WASD / arrows: move · drag right side: camera · E: interact · Shift: run · 1/2/3: seeds · M: mute</div>
 <canvas id="c"></canvas>
+<script>
+  // Surface load-time failures in the loader UI instead of a silent hang.
+  (function () {
+    var msg = document.getElementById("msg");
+    function show(text) { if (msg) { msg.textContent = text; msg.style.color = "#ffe0e0"; } }
+    window.addEventListener("error", function (e) {
+      var detail = e.message || (e.target && e.target.src) || "failed to load";
+      show("Could not start the engine: " + detail);
+    }, true);
+    window.addEventListener("unhandledrejection", function (e) {
+      var r = e.reason;
+      show("Could not start the engine: " + (r && r.message ? r.message : String(r)));
+    });
+  })();
+</script>
 <script type="module" src="./boot.js"></script>
 </body>
 </html>

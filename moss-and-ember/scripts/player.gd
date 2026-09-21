@@ -1,11 +1,12 @@
 extends CharacterBody3D
+const WB := preload("res://scripts/world_builder.gd")
 ## Third-person farmer: keyboard + mouse + touch, orbit camera, interaction.
 
 const SPEED := 3.4
 const SPRINT_SPEED := 5.4
 const ACCEL := 12.0
 const GRAVITY := 22.0
-const CAMERA_DIST := 6.2
+const CAMERA_DIST := 7.0  # classic third-person follow distance
 const PITCH_MIN := deg_to_rad(-58.0)
 const PITCH_MAX := deg_to_rad(-10.0)
 const INTERACT_RANGE := 2.6
@@ -55,45 +56,45 @@ func _build_character() -> void:
 	_body_root.name = "BodyRoot"
 	add_child(_body_root)
 
-	var skin := WorldBuilder.mat(Color(0.93, 0.76, 0.6), 0.7)
-	var shirt := WorldBuilder.mat(Color(0.42, 0.55, 0.28), 0.9)
-	var pants := WorldBuilder.mat(Color(0.35, 0.42, 0.55), 0.9)
-	var hatm := WorldBuilder.mat(Color(0.95, 0.8, 0.35), 0.8)
-	var eye := WorldBuilder.mat(Color(0.15, 0.13, 0.12), 0.4)
+	var skin := WB.mat(Color(0.93, 0.76, 0.6), 0.7)
+	var shirt := WB.mat(Color(0.42, 0.55, 0.28), 0.9)
+	var pants := WB.mat(Color(0.35, 0.42, 0.55), 0.9)
+	var hatm := WB.mat(Color(0.95, 0.8, 0.35), 0.8)
+	var eye := WB.mat(Color(0.15, 0.13, 0.12), 0.4)
 
 	# legs (pivots at hips)
 	_leg_l = _limb_pivot(_body_root, Vector3(-0.13, 0.92, 0), pants, 0.12, 0.5)
 	_leg_r = _limb_pivot(_body_root, Vector3(0.13, 0.92, 0), pants, 0.12, 0.5)
 	# body
-	var body := WorldBuilder.capsule(0.3, 0.8, shirt)
+	var body := WB.capsule(0.3, 0.8, shirt)
 	body.position = Vector3(0, 1.3, 0)
 	_body_root.add_child(body)
 	# arms (pivots at shoulders)
 	_arm_l = _limb_pivot(_body_root, Vector3(-0.4, 1.58, 0), shirt, 0.09, 0.5)
 	_arm_r = _limb_pivot(_body_root, Vector3(0.4, 1.58, 0), shirt, 0.09, 0.5)
 	# hands
-	var hand_l := WorldBuilder.sphere(0.08, skin, 0.9)
+	var hand_l := WB.sphere(0.08, skin, 0.9)
 	hand_l.position = Vector3(-0.4, 1.0, 0)
 	_body_root.add_child(hand_l)
-	var hand_r := WorldBuilder.sphere(0.08, skin, 0.9)
+	var hand_r := WB.sphere(0.08, skin, 0.9)
 	hand_r.position = Vector3(0.4, 1.0, 0)
 	_body_root.add_child(hand_r)
 	# head
-	var head := WorldBuilder.sphere(0.24, skin, 1.0)
+	var head := WB.sphere(0.24, skin, 1.0)
 	head.position = Vector3(0, 1.92, 0)
 	_body_root.add_child(head)
 	# eyes (front = +z)
-	var eye_l := WorldBuilder.sphere(0.032, eye, 1.0)
+	var eye_l := WB.sphere(0.032, eye, 1.0)
 	eye_l.position = Vector3(-0.09, 1.95, 0.21)
 	_body_root.add_child(eye_l)
-	var eye_r := WorldBuilder.sphere(0.032, eye, 1.0)
+	var eye_r := WB.sphere(0.032, eye, 1.0)
 	eye_r.position = Vector3(0.09, 1.95, 0.21)
 	_body_root.add_child(eye_r)
 	# straw hat
-	var brim := WorldBuilder.cylinder(0.44, 0.46, 0.05, hatm)
+	var brim := WB.cylinder(0.44, 0.46, 0.05, hatm)
 	brim.position = Vector3(0, 2.06, 0)
 	_body_root.add_child(brim)
-	var crown := WorldBuilder.cylinder(0.27, 0.3, 0.24, hatm)
+	var crown := WB.cylinder(0.27, 0.3, 0.24, hatm)
 	crown.position = Vector3(0, 2.18, 0)
 	_body_root.add_child(crown)
 
@@ -102,7 +103,7 @@ func _limb_pivot(parent: Node3D, pivot_pos: Vector3, material: Material,
 	var pivot := Node3D.new()
 	pivot.position = pivot_pos
 	parent.add_child(pivot)
-	var mesh := WorldBuilder.capsule(radius, length, material)
+	var mesh := WB.capsule(radius, length, material)
 	mesh.position = Vector3(0, -length * 0.5, 0)
 	pivot.add_child(mesh)
 	return pivot

@@ -1,4 +1,5 @@
 extends Node3D
+const WB := preload("res://scripts/world_builder.gd")
 ## Pip the farmer's neighbor — stands at the stall, offers lines and the shop.
 
 signal dialog_requested(line: String)
@@ -22,42 +23,42 @@ func _ready() -> void:
 func _build() -> void:
 	_body_root = Node3D.new()
 	add_child(_body_root)
-	var skin := WorldBuilder.mat(Color(0.87, 0.68, 0.52), 0.7)
-	var tunic := WorldBuilder.mat(Color(0.3, 0.45, 0.65), 0.9)
-	var apron := WorldBuilder.mat(Color(0.9, 0.86, 0.75), 0.9)
-	var hair := WorldBuilder.mat(Color(0.3, 0.22, 0.16), 0.8)
-	var eye := WorldBuilder.mat(Color(0.15, 0.13, 0.12), 0.4)
+	var skin := WB.mat(Color(0.87, 0.68, 0.52), 0.7)
+	var tunic := WB.mat(Color(0.3, 0.45, 0.65), 0.9)
+	var apron := WB.mat(Color(0.9, 0.86, 0.75), 0.9)
+	var hair := WB.mat(Color(0.3, 0.22, 0.16), 0.8)
+	var eye := WB.mat(Color(0.15, 0.13, 0.12), 0.4)
 
-	var body := WorldBuilder.capsule(0.3, 0.9, tunic)
+	var body := WB.capsule(0.3, 0.9, tunic)
 	body.position = Vector3(0, 1.25, 0)
 	_body_root.add_child(body)
-	var apron_box := WorldBuilder.box(Vector3(0.42, 0.55, 0.1), apron)
+	var apron_box := WB.box(Vector3(0.42, 0.55, 0.1), apron)
 	apron_box.position = Vector3(0, 1.05, 0.24)
 	_body_root.add_child(apron_box)
 	for s in [-1.0, 1.0]:
-		var arm := WorldBuilder.capsule(0.09, 0.55, tunic)
+		var arm := WB.capsule(0.09, 0.55, tunic)
 		arm.position = Vector3(s * 0.4, 1.2, 0)
 		arm.rotation.z = s * 0.15
 		_body_root.add_child(arm)
-		var hand := WorldBuilder.sphere(0.08, skin, 0.9)
+		var hand := WB.sphere(0.08, skin, 0.9)
 		hand.position = Vector3(s * 0.45, 0.85, 0)
 		_body_root.add_child(hand)
 	for s in [-1.0, 1.0]:
-		var leg := WorldBuilder.capsule(0.11, 0.5, WorldBuilder.mat(Color(0.3, 0.28, 0.25), 0.9))
+		var leg := WB.capsule(0.11, 0.5, WB.mat(Color(0.3, 0.28, 0.25), 0.9))
 		leg.position = Vector3(s * 0.13, 0.45, 0)
 		_body_root.add_child(leg)
-	var head := WorldBuilder.sphere(0.24, skin, 1.0)
+	var head := WB.sphere(0.24, skin, 1.0)
 	head.position = Vector3(0, 1.95, 0)
 	_body_root.add_child(head)
-	var hair_cap := WorldBuilder.sphere(0.25, hair, 0.75)
+	var hair_cap := WB.sphere(0.25, hair, 0.75)
 	hair_cap.position = Vector3(0, 2.06, -0.04)
 	_body_root.add_child(hair_cap)
 	for s in [-1.0, 1.0]:
-		var e := WorldBuilder.sphere(0.03, eye, 1.0)
+		var e := WB.sphere(0.03, eye, 1.0)
 		e.position = Vector3(s * 0.09, 1.97, 0.21)
 		_body_root.add_child(e)
 	# smile
-	var smile := WorldBuilder.box(Vector3(0.1, 0.02, 0.02), eye)
+	var smile := WB.box(Vector3(0.1, 0.02, 0.02), eye)
 	smile.position = Vector3(0, 1.87, 0.22)
 	_body_root.add_child(smile)
 

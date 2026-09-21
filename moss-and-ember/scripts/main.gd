@@ -1,4 +1,5 @@
 extends Node3D
+const WB := preload("res://scripts/world_builder.gd")
 ## Main scene: builds the world, entities, UI, and wires the game loop.
 
 var player: CharacterBody3D
@@ -14,6 +15,9 @@ var _barn_windows: Array[MeshInstance3D] = []
 var _juice_nodes: Array[Dictionary] = []
 var _juice_mesh: Mesh
 var _game_started := false
+var _photo_mode := false
+var _photo: Camera3D = null
+var _photo_angle := 0.0
 
 func _ready() -> void:
 	randomize()
@@ -29,8 +33,23 @@ func _ready() -> void:
 	chicken.set_physics_process(false)
 	villager.set_physics_process(false)
 
-	if OS.get_cmdline_user_args().has("--self-test"):
+	# Test hooks. Native: run with "-- --self-test". Web: the page URL gets
+	# ?selftest / ?autostart and boot.js stages res://test_flags.json.
+	var user_args: PackedStringArray = OS.get_cmdline_user_args()
+	var flags := _read_test_flags()
+	if user_args.has("--self-test") or flags.get("selftest", false):
 		_self_test()
+		return
+	if user_args.has("--autostart") or flags.get("autostart", false):
+		_on_new_game()
+		if flags.get("noon", false):
+			GameState.time_of_day = 6.0  # noon (0h == 06:00)
+			GameState.time_changed.emit(GameState.get_hour())
+		return
+
+	if flags.get("photo", false):
+		_start_game()
+		_toggle_photo_mode(0.6)
 		return
 
 	var has_save: bool = GameState.has_save()
@@ -38,7 +57,7 @@ func _ready() -> void:
 
 # ----------------------------------------------------------------- world ---
 func _add_world() -> void:
-	var world := WorldBuilder.build_world()
+	var world := WB.build_world()
 	add_child(world)
 	for n in world.find_children("*", "MeshInstance3D", true, false):
 		if n.name == "BarnWindow":
@@ -65,7 +84,10 @@ func _add_entities() -> void:
 
 	player = load("res://scenes/player.tscn").instantiate()
 	add_child(player)
-	player.position = Vector3(0, 0, 10.0)
+	# Spawn beside the path, looking north across the plots — with clear space
+	# behind so the follow camera never starts inside the market stall.
+	player.position = Vector3(1.8, 0, 9.0)
+	player.camera_yaw = 0.2
 	player.add_to_group("player")
 	camera = player.camera
 	player.interactables = farm.get_interactables() + [chicken, villager]
@@ -96,6 +118,35 @@ func _wire_signals() -> void:
 	sky.night_level_changed.connect(_on_night_level_changed)
 	ui.new_game_requested.connect(_on_new_game)
 	ui.continue_requested.connect(_on_continue)
+
+## Overview camera for screenshots/trailers: press P (or load with ?photo).
+## Orbits the farm from above instead of following the player.
+func _toggle_photo_mode(angle := 0.0) -> void:
+	_photo_mode = not _photo_mode
+	if _photo_mode:
+		_photo = Camera3D.new()
+		_photo.name = "PhotoCamera"
+		_photo.fov = 55.0
+		add_child(_photo)
+		_photo.make_current()
+		_photo_angle = angle
+		print("[photo] overview camera on (press P to go back)")
+	else:
+		if _photo:
+			_photo.queue_free()
+			_photo = null
+		camera.make_current()
+		print("[photo] back to the follow camera")
+
+func _photo_update(delta: float) -> void:
+	if not _photo_mode or _photo == null:
+		return
+	_photo_angle += delta * 0.18
+	var r := 17.0
+	var center := Vector3(0.0, 1.0, 0.0)
+	_photo.global_position = center + Vector3(cos(_photo_angle) * r, 10.5, sin(_photo_angle) * r)
+	_photo.look_at(center + Vector3(0, -0.5, 0), Vector3.UP)
+
 
 func _on_night_level_changed(night: float) -> void:
 	var glow: bool = night > 0.55
@@ -139,7 +190,7 @@ func _on_juice_requested(pos: Vector3, color: Color, text: String = "") -> void:
 		ui.add_float(pos + Vector3(0, 0.6, 0), text, color)
 
 func _spawn_burst(pos: Vector3, color: Color) -> void:
-	var material := WorldBuilder.mat(color, 0.4)
+	var material := WB.mat(color, 0.4)
 	material.emission_enabled = true
 	material.emission = color
 	material.emission_energy_multiplier = 0.6
@@ -152,22 +203,13 @@ func _spawn_burst(pos: Vector3, color: Color) -> void:
 		var vel := Vector3(randf_range(-1.6, 1.6), randf_range(1.5, 3.4), randf_range(-1.6, 1.6))
 		_juice_nodes.append({"node": mi, "vel": vel, "life": randf_range(0.35, 0.6)})
 
-func _process(delta: float) -> void:
-	if _juice_nodes.is_empty():
-		return
-	var i := _juice_nodes.size() - 1
-	while i >= 0:
-		var j: Dictionary = _juice_nodes[i]
-		j["life"] = float(j["life"]) - delta
-		if float(j["life"]) <= 0.0:
-			j["node"].queue_free()
-			_juice_nodes.remove_at(i)
-		else:
-			j["vel"] = (j["vel"] as Vector3) + Vector3(0, -9.8 * delta, 0)
-			j["node"].position = (j["node"].position as Vector3) + (j["vel"] as Vector3) * delta
-			j["node"].scale = Vector3.ONE * clampf(float(j["life"]) * 2.2, 0.1, 1.0)
-		i -= 1
+func _unhandled_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k != null and k.pressed and not k.echo and k.keycode == KEY_P:
+		_toggle_photo_mode()
 
+func _process(delta: float) -> void:
+	_photo_update(delta)
 # -------------------------------------------------------------- self test ---
 var _st := {"ok": true, "checks": 0, "fails": []}
 
@@ -176,6 +218,17 @@ func check(cond: bool, msg: String) -> void:
 	if not cond:
 		_st["ok"] = false
 		_st["fails"].append(msg)
+
+## Reads res://test_flags.json when the browser smoke test staged one.
+func _read_test_flags() -> Dictionary:
+	if not FileAccess.file_exists("res://test_flags.json"):
+		return {}
+	var f := FileAccess.open("res://test_flags.json", FileAccess.READ)
+	if f == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	return parsed if parsed is Dictionary else {}
+
 
 func _self_test() -> void:
 	_st = {"ok": true, "checks": 0, "fails": []}
@@ -186,6 +239,17 @@ func _self_test() -> void:
 	check(villager != null, "villager missing")
 	check(sky != null, "sky missing")
 	check(ui != null, "ui missing")
+
+	# Audio ships as importer-free .tres resources; make sure they really load.
+	var music: AudioStream = load("res://audio/music_main.tres")
+	check(music is AudioStreamWAV, "music resource missing")
+	if music is AudioStreamWAV:
+		var m: AudioStreamWAV = music
+		check(m.loop_mode == AudioStreamWAV.LOOP_FORWARD, "music does not loop")
+		check(m.get_length() > 30.0, "music too short")
+		check(m.data.size() > 1000000, "music data empty")
+	var sfx: AudioStream = load("res://audio/sfx_pop.tres")
+	check(sfx is AudioStreamWAV, "sfx resource missing")
 
 	GameState.new_game()
 	check(GameState.money == 25, "start money")

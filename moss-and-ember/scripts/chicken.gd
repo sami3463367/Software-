@@ -1,4 +1,5 @@
 extends Node3D
+const WB := preload("res://scripts/world_builder.gd")
 ## A farm chicken: idle, peck, wander, flee, and pettable.
 
 signal juice_requested(pos: Vector3, color: Color, text: String)
@@ -23,35 +24,35 @@ func _ready() -> void:
 func _build() -> void:
 	_body_root = Node3D.new()
 	add_child(_body_root)
-	var white := WorldBuilder.mat(Color(0.97, 0.96, 0.92), 0.8)
-	var red := WorldBuilder.mat(Color(0.85, 0.25, 0.2), 0.5)
-	var yellow := WorldBuilder.mat(Color(0.95, 0.75, 0.2), 0.5)
-	var body := WorldBuilder.sphere(0.2, white, 0.9)
+	var white := WB.mat(Color(0.97, 0.96, 0.92), 0.8)
+	var red := WB.mat(Color(0.85, 0.25, 0.2), 0.5)
+	var yellow := WB.mat(Color(0.95, 0.75, 0.2), 0.5)
+	var body := WB.sphere(0.2, white, 0.9)
 	body.position = Vector3(0, 0.32, 0)
 	_body_root.add_child(body)
-	var tail := WorldBuilder.sphere(0.09, white, 0.7)
+	var tail := WB.sphere(0.09, white, 0.7)
 	tail.position = Vector3(0, 0.4, -0.18)
 	tail.rotation.x = 0.7
 	_body_root.add_child(tail)
 	_head = Node3D.new()
 	_head.position = Vector3(0, 0.45, 0.14)
 	_body_root.add_child(_head)
-	var skull := WorldBuilder.sphere(0.1, white, 0.9)
+	var skull := WB.sphere(0.1, white, 0.9)
 	skull.position = Vector3(0, 0.06, 0.05)
 	_head.add_child(skull)
-	var beak := WorldBuilder.cylinder(0.03, 0.015, 0.09, yellow)
+	var beak := WB.cylinder(0.03, 0.015, 0.09, yellow)
 	beak.position = Vector3(0, 0.04, 0.16)
 	beak.rotation.x = PI / 2.0
 	_head.add_child(beak)
-	var comb := WorldBuilder.box(Vector3(0.04, 0.07, 0.05), red)
+	var comb := WB.box(Vector3(0.04, 0.07, 0.05), red)
 	comb.position = Vector3(0, 0.16, 0.03)
 	_head.add_child(comb)
 	for s in [-1.0, 1.0]:
-		var wattle := WorldBuilder.sphere(0.03, red, 1.2)
+		var wattle := WB.sphere(0.03, red, 1.2)
 		wattle.position = Vector3(s * 0.04, -0.02, 0.12)
 		_head.add_child(wattle)
 	for s in [-1.0, 1.0]:
-		var foot := WorldBuilder.cylinder(0.02, 0.02, 0.14, yellow)
+		var foot := WB.cylinder(0.02, 0.02, 0.14, yellow)
 		foot.position = Vector3(s * 0.08, 0.06, 0)
 		_body_root.add_child(foot)
 

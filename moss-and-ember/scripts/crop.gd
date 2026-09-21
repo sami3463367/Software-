@@ -1,4 +1,5 @@
 extends Node3D
+const WB := preload("res://scripts/world_builder.gd")
 ## One farm cell: grows a crop through 4 visual stages, plant/harvest on interact.
 
 signal juice(color: Color, text: String)
@@ -21,12 +22,12 @@ const GREEN_DARK := Color(0.28, 0.55, 0.22)
 func _ready() -> void:
 	_root = Node3D.new()
 	add_child(_root)
-	_ready_marker = WorldBuilder.sphere(0.09, _marker_material(), 1.0)
+	_ready_marker = WB.sphere(0.09, _marker_material(), 1.0)
 	_ready_marker.visible = false
 	add_child(_ready_marker)
 
 func _marker_material() -> StandardMaterial3D:
-	var m := WorldBuilder.mat(Color(1.0, 0.85, 0.2), 0.3)
+	var m := WB.mat(Color(1.0, 0.85, 0.2), 0.3)
 	m.emission_enabled = true
 	m.emission = Color(1.0, 0.8, 0.15)
 	m.emission_energy_multiplier = 1.5
@@ -76,36 +77,36 @@ func _rebuild(type_: String = "") -> void:
 		child.queue_free()
 	if type_ == "" and _stage >= 0:
 		type_ = str(GameState.crop_info(cell_id).get("type", ""))
-	var stem := WorldBuilder.mat(GREEN, 0.8)
-	var stem_dark := WorldBuilder.mat(GREEN_DARK, 0.8)
+	var stem := WB.mat(GREEN, 0.8)
+	var stem_dark := WB.mat(GREEN_DARK, 0.8)
 	match _stage:
 		-1:
 			pass  # empty tilled row (the farm draws it)
 		0:
 			# seed mound
-			var mound := WorldBuilder.sphere(0.09,
-				WorldBuilder.mat(Color(0.33, 0.22, 0.13), 1.0), 0.5)
+			var mound := WB.sphere(0.09,
+				WB.mat(Color(0.33, 0.22, 0.13), 1.0), 0.5)
 			mound.position = Vector3(0, 0.02, 0)
 			_root.add_child(mound)
-			var seed := WorldBuilder.sphere(0.03,
-				WorldBuilder.mat(Color(0.9, 0.82, 0.55), 0.6), 0.7)
+			var seed := WB.sphere(0.03,
+				WB.mat(Color(0.9, 0.82, 0.55), 0.6), 0.7)
 			seed.position = Vector3(0, 0.06, 0)
 			_root.add_child(seed)
 		1:
-			var sprout := WorldBuilder.cylinder(0.015, 0.03, 0.16, stem)
+			var sprout := WB.cylinder(0.015, 0.03, 0.16, stem)
 			sprout.position = Vector3(0, 0.08, 0)
 			_root.add_child(sprout)
 			for s in [-1.0, 1.0]:
-				var leaf := WorldBuilder.sphere(0.05, stem_dark, 0.5)
+				var leaf := WB.sphere(0.05, stem_dark, 0.5)
 				leaf.position = Vector3(s * 0.05, 0.14, 0)
 				leaf.rotation.z = s * 0.9
 				_root.add_child(leaf)
 		2:
-			var stalk := WorldBuilder.cylinder(0.02, 0.035, 0.42, stem)
+			var stalk := WB.cylinder(0.02, 0.035, 0.42, stem)
 			stalk.position = Vector3(0, 0.21, 0)
 			_root.add_child(stalk)
 			for i in 4:
-				var leaf := WorldBuilder.sphere(0.07, stem_dark, 0.45)
+				var leaf := WB.sphere(0.07, stem_dark, 0.45)
 				leaf.position = Vector3(
 					cos(i * 1.6) * 0.08, 0.14 + i * 0.09, sin(i * 1.6) * 0.08)
 				leaf.rotation.y = i * 1.6
@@ -117,43 +118,43 @@ func _grown(type_: String, stem: Material, stem_dark: Material) -> void:
 	match type_:
 		"wheat":
 			for i in 3:
-				var stalk := WorldBuilder.cylinder(0.015, 0.02, 0.55, stem)
+				var stalk := WB.cylinder(0.015, 0.02, 0.55, stem)
 				stalk.position = Vector3(cos(i * 2.1) * 0.09, 0.27, sin(i * 2.1) * 0.09)
 				stalk.rotation.z = cos(i * 2.1) * 0.12
 				_root.add_child(stalk)
 			for i in 3:
-				var head := WorldBuilder.capsule(0.045, 0.16,
-					WorldBuilder.mat(WHEAT_GOLD, 0.7))
+				var head := WB.capsule(0.045, 0.16,
+					WB.mat(WHEAT_GOLD, 0.7))
 				head.position = Vector3(
 					cos(i * 2.1) * 0.09, 0.6, sin(i * 2.1) * 0.09)
 				head.rotation.z = cos(i * 2.1) * 0.12
 				_root.add_child(head)
 		"tomato":
-			var bush := WorldBuilder.sphere(0.24, stem_dark, 0.9)
+			var bush := WB.sphere(0.24, stem_dark, 0.9)
 			bush.position = Vector3(0, 0.24, 0)
 			_root.add_child(bush)
-			var bush2 := WorldBuilder.sphere(0.17, stem, 0.9)
+			var bush2 := WB.sphere(0.17, stem, 0.9)
 			bush2.position = Vector3(0.08, 0.36, 0.05)
 			_root.add_child(bush2)
 			for i in 5:
-				var tomato := WorldBuilder.sphere(0.055,
-					WorldBuilder.mat(TOMATO_RED, 0.35), 0.9)
+				var tomato := WB.sphere(0.055,
+					WB.mat(TOMATO_RED, 0.35), 0.9)
 				var a := i * 2.3
 				tomato.position = Vector3(cos(a) * 0.18, 0.2 + (i % 3) * 0.09, sin(a) * 0.18)
 				_root.add_child(tomato)
 		"pumpkin":
-			var vine := WorldBuilder.sphere(0.16, stem_dark, 0.4)
+			var vine := WB.sphere(0.16, stem_dark, 0.4)
 			vine.position = Vector3(0, 0.08, 0)
 			_root.add_child(vine)
 			for i in 4:
-				var leaf := WorldBuilder.sphere(0.07, stem, 0.4)
+				var leaf := WB.sphere(0.07, stem, 0.4)
 				leaf.position = Vector3(cos(i * 1.7) * 0.14, 0.07, sin(i * 1.7) * 0.14)
 				_root.add_child(leaf)
-			var pumpkin := WorldBuilder.sphere(0.17,
-				WorldBuilder.mat(PUMPKIN_ORANGE, 0.5), 0.75)
+			var pumpkin := WB.sphere(0.17,
+				WB.mat(PUMPKIN_ORANGE, 0.5), 0.75)
 			pumpkin.position = Vector3(0, 0.1, 0)
 			_root.add_child(pumpkin)
-			var neck := WorldBuilder.box(Vector3(0.05, 0.1, 0.05), stem_dark)
+			var neck := WB.box(Vector3(0.05, 0.1, 0.05), stem_dark)
 			neck.position = Vector3(0, 0.24, 0)
 			_root.add_child(neck)
 		_:

@@ -21,10 +21,21 @@ playable right now in the browser; no installation, no PC required.
 
 - **Engine:** Godot 4.7.2 (Forward+ / mobile renderer), pure GDScript, all
   geometry is procedural primitives — zero external art assets.
-- **Browser build:** the sandbox builds the Godot engine from source (no
-  internet access to the official CDN here), and the web template comes from a
-  public npm package; `web/boot.js` stages the project into the engine's
-  in-memory FS and boots it. `web/serve.py` assembles + serves the site.
+- **Browser build:** the web engine (Godot 4.7.2, thread support off) is
+  vendored in `web/engine/` and comes from the public npm package
+  `@ringozz/godot-web-wasm32`; `web/boot.js` stages the project into the
+  engine's in-memory FS and then drives the engine's frame loop
+  (`godot.iteration()`, the same loop `@ringozz/godot` uses on the web).
+  `web/serve.py` assembles + serves the site:
+  `python3 web/serve.py 8080` → http://localhost:8080
+- **Audio:** ships as `.tres` resources with base64 PCM (`tools/wav_to_tres.py`),
+  so the runtime needs no import cache — the web build loads the same files the
+  desktop build does.
+- **Browser smoke test:** `node tools/boottest.cjs` boots the real page in a
+  headless Chromium (see `tools/setup_chromelibs.sh` for the one-time setup),
+  runs the in-engine self-test via `?selftest` and fails on any script error.
+  `?autostart` jumps straight into gameplay, `?noon` sets midday,
+  `?photo` flies an overview camera, `?debug` shows the engine log.
 - **Local editor run:** open this folder in Godot 4.7.2 and press F5.
 - **Windows export (needs internet once):** install the official Godot
   4.7.2 export templates, then:
