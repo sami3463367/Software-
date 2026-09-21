@@ -3,6 +3,9 @@
 A cozy 3D farm sim — our first product. **Slice 0.1** (proof of concept) is
 playable right now in the browser; no installation, no PC required.
 
+![title screen](docs/screenshot-title.png)
+![the farm at noon](docs/screenshot-farm.png)
+
 ## What's in the slice
 
 - Third-person farmer on a small valley farm (walk, run, orbit camera)
